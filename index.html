@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Desmonte</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Estudo interativo de como se monta um site animado com Three.js, anime.js e scroll.">
+<script>
+  // Marca que há JS. Se o módulo principal não sinalizar em 8 s (CDN fora do ar,
+  // navegador antigo), a página volta ao modo estático e legível.
+  document.documentElement.classList.add('js', 'is-loading');
+  document.documentElement.lang = 'pt-BR';
+  setTimeout(function () {
+    if (!window.__desmonte) document.documentElement.classList.add('js-failed');
+  }, 8000);
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,100..800&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<!--
+  Sem etapa de build: o import map diz ao navegador de onde vem cada pacote.
+  O adaptador Three do anime.js e o core precisam vir da MESMA base de URL
+  para compartilharem o registro interno de adaptadores.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/",
+    "animejs": "https://cdn.jsdelivr.net/npm/animejs@4.5.0/dist/modules/index.js",
+    "animejs/adapters/three": "https://cdn.jsdelivr.net/npm/animejs@4.5.0/dist/modules/adapters/three/index.js"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- Camada 0: o palco WebGL fixo atrás de tudo -->
+<div id="engine" aria-hidden="true"></div>
+
+<!-- Carregador: só HTML/CSS e um observador de recursos, sem depender dos módulos -->
+<div id="loader" aria-hidden="true">
+  <svg class="loader-ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46"/><circle class="loader-arc" cx="50" cy="50" r="46"/></svg>
+  <p class="loader-text"><span class="loader-label">montando peças</span> <span class="loader-count">00</span></p>
+</div>
+<script>
+  (function () {
+    var count = document.querySelector('#loader .loader-count');
+    var n = 0;
+    try {
+      var po = new PerformanceObserver(function (list) {
+        list.getEntries().forEach(function (e) {
+          if (/cdn\.jsdelivr\.net|\/js\/|fonts\.gstatic/.test(e.name)) n++;
+        });
+        if (count) count.textContent = (n < 10 ? '0' : '') + n;
+      });
+      po.observe({ type: 'resource', buffered: true });
+      window.__loaderObserver = po;
+    } catch (e) {}
+  })();
+</script>
+
+<header id="site-header">
+  <a class="wordmark" href="#intro" aria-label="Desmonte, voltar ao início">
+    <span class="wordmark-letters" aria-hidden="true">desmonte</span><span class="wordmark-dot" aria-hidden="true"></span>
+  </a>
+  <nav id="site-menu" aria-label="Seções">
+    <ul>
+      <li><a href="#pecas">Peças</a></li>
+      <li><a href="#tecnicas">Técnicas</a></li>
+      <li><a href="#arquitetura">Arquitetura</a></li>
+      <li><a href="#comecar">Começar</a></li>
+      <li><a class="nav-ext" href="https://animejs.com/documentation" target="_blank" rel="noopener">anime.js<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></li>
+      <li><a class="nav-ext" href="https://threejs.org/docs/" target="_blank" rel="noopener">three.js<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 16 16 8M9.5 8H16v6.5"/></svg></a></li>
+    </ul>
+  </nav>
+  <button id="menu-toggle" type="button" aria-expanded="false" aria-controls="site-menu">
+    <span class="sr-only">Abrir menu</span>
+    <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h16M4 15.5h16"/></svg>
+  </button>
+</header>
+
+<main id="home">
+
+  <!-- ===================== 01 · HERO ===================== -->
+  <section id="intro" class="chapter" data-chapter="intro" data-label="HERO" data-sheet="01">
+    <div class="hero">
+      <div class="hero-text">
+        <h1 class="hero-title">Toda<br> animação<br> tem peças<span class="hero-dot">.</span></h1>
+        <p class="hero-lede">Um estudo interativo de como montar um site que anima
+          <span class="swap-wrap"><span class="swap-word">a web</span><span class="swap-caret" aria-hidden="true"></span></span>
+        </p>
+      </div>
+      <div class="hero-foot">
+        <div class="hero-actions">
+          <div class="install">
+            <code id="install-cmd">npm i animejs three</code>
+            <button class="icon-btn copy-btn" type="button" data-copy="#install-cmd" aria-label="Copiar comando de instalação">
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="10" height="10" rx="2"/><path d="M15.5 5.5h-8a2 2 0 0 0-2 2v8"/></svg>
+            </button>
+          </div>
+          <a class="btn btn-ghost" href="#pecas">Ver as peças
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v13M6.5 13 12 18.5 17.5 13"/></svg>
+          </a>
+        </div>
+        <dl class="carimbo" aria-label="Carimbo do desenho">
+          <div><dt>Projeto</dt><dd>desmonte</dd></div>
+          <div><dt>Folha</dt><dd><span data-sheet-now>01</span>/06</dd></div>
+          <div><dt>Escala</dt><dd>1:1</dd></div>
+          <div><dt>Rev.</dt><dd>A</dd></div>
+        </dl>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="spacer half"></div>
+  </section>
+
+  <!-- ===================== 02 · VISTA EXPLODIDA ===================== -->
+  <section id="pecas" class="chapter is-blueprint" data-chapter="pecas" data-label="PECAS" data-sheet="02"
+           data-enter-offset="-=60lvh" data-leave-offset="-=40lvh">
+    <div class="fixed-section">
+      <div class="fixed-inner">
+        <div class="chapter-text">
+          <p class="eyebrow">Folha 02 · Vista explodida</p>
+          <h2 class="chapter-title">O motor,<br>peça por peça</h2>
+          <p class="chapter-lede">Este site é uma máquina pequena. Cada peça do motor é uma técnica que faz a página funcionar. Role para separá-las.</p>
+        </div>
+      </div>
+    </div>
+    <!-- rótulos com linhas de chamada: posicionados no JS a partir da projeção 3D -->
+    <div class="callouts" aria-hidden="true">
+      <ul class="callouts-left"></ul>
+      <ul class="callouts-right"></ul>
+      <svg class="callout-lines"></svg>
+    </div>
+    <div class="spacer"></div>
+    <div class="spacer"></div>
+    <div class="spacer"></div>
+    <div class="spacer"></div>
+  </section>
+
+  <!-- ===================== 03 · TÉCNICAS ===================== -->
+  <section id="tecnicas" class="chapter" data-chapter="tecnicas" data-label="TECNICAS" data-sheet="03">
+
+    <article class="feature" data-feature="api" style="--part: var(--c0)">
+      <div class="feature-text">
+        <h2>Uma API para tudo</h2>
+        <p>Propriedades, keyframes e easings, cada um com seus próprios parâmetros, em uma única chamada de <code>animate()</code>.</p>
+        <ul class="feature-links">
+          <li><a href="https://animejs.com/documentation/animation/tween-parameters" target="_blank" rel="noopener">Parâmetros por propriedade</a></li>
+          <li><a href="https://animejs.com/documentation/animation/keyframes" target="_blank" rel="noopener">Keyframes</a></li>
+          <li><a href="https://animejs.com/documentation/easings" target="_blank" rel="noopener">Easings</a></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="feature" data-feature="blend" style="--part: var(--c1)">
+      <div class="feature-text">
+        <h2>Movimentos que se somam</h2>
+        <p>Com <code>composition: 'blend'</code>, uma animação nova se mistura à que já está rodando. Passe o ponteiro sobre a tela.</p>
+        <ul class="feature-links">
+          <li><a href="https://animejs.com/documentation/animation/tween-parameters/composition" target="_blank" rel="noopener">Composição</a></li>
+          <li><a href="https://animejs.com/documentation/animation/tween-parameters/modifier" target="_blank" rel="noopener">Modificadores</a></li>
+          <li><a href="https://animejs.com/documentation/timer" target="_blank" rel="noopener">Timer</a></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="feature" data-feature="scroll" style="--part: var(--c2)">
+      <div class="feature-text">
+        <h2>O scroll vira tempo</h2>
+        <p><code>onScroll</code> liga a posição da página ao progresso de uma animação. Role devagar e veja as órbitas.</p>
+        <ul class="feature-links">
+          <li><a href="https://animejs.com/documentation/events/onscroll" target="_blank" rel="noopener">onScroll</a></li>
+          <li><a href="https://animejs.com/documentation/svg/createdrawable" target="_blank" rel="noopener">createDrawable</a></li>
+          <li><a href="https://animejs.com/documentation/utilities/stagger" target="_blank" rel="noopener">stagger</a></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="feature" data-feature="stagger" style="--part: var(--c3)">
+      <div class="feature-text">
+        <h2>Atrasos em grade</h2>
+        <p><code>stagger</code> distribui tempos e valores por uma grade, a partir de qualquer ponto. Clique numa célula.</p>
+        <ul class="feature-links">
+          <li><a href="https://animejs.com/documentation/utilities/stagger/stagger-parameters/stagger-grid" target="_blank" rel="noopener">Grade</a></li>
+          <li><a href="https://animejs.com/documentation/utilities/stagger/stagger-parameters/stagger-from" target="_blank" rel="noopener">Origem</a></li>
+          <li><a href="https://animejs.com/documentation/utilities/stagger/values-staggering" target="_blank" rel="noopener">Valores escalonados</a></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="feature" data-feature="svg" style="--part: var(--c4)">
+      <div class="feature-text">
+        <h2>Ferramentas de SVG</h2>
+        <p>Desenhe traços, siga caminhos e transforme formas com <code>createDrawable</code>, <code>createMotionPath</code> e <code>morphTo</code>.</p>
+        <ul class="feature-links">
+          <li><a href="https://animejs.com/documentation/svg/createdrawable" target="_blank" rel="noopener">Desenho de linhas</a></li>
+          <li><a href="https://animejs.com/documentation/svg/createmotionpath" target="_blank" rel="noopener">Caminho de movimento</a></li>
+          <li><a href="https://animejs.com/documentation/svg/morphto" target="_blank" rel="noopener">Transformação de formas</a></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="feature" data-feature="drag" style="--part: var(--c5)">
+      <div class="feature-text">
+        <h2>Arraste com mola</h2>
+        <p><code>createDraggable</code> com uma mola na soltura. Puxe a peça do centro da tela e solte.</p>
+        <ul class="feature-links">
+          <li><a href="https://animejs.com/documentation/draggable/draggable-settings" target="_blank" rel="noopener">Configurações</a></li>
+          <li><a href="https://animejs.com/documentation/easings/spring" target="_blank" rel="noopener">Molas</a></li>
+          <li><a href="https://animejs.com/documentation/draggable/draggable-callbacks" target="_blank" rel="noopener">Callbacks</a></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="feature" data-feature="timeline" style="--part: var(--c6)">
+      <div class="feature-text">
+        <h2>Sequência sincronizada</h2>
+        <p>Uma timeline posiciona cada animação no tempo, como um sequenciador de bateria.</p>
+        <ul class="feature-links">
+          <li><a href="https://animejs.com/documentation/timeline" target="_blank" rel="noopener">Timeline</a></li>
+          <li><a href="https://animejs.com/documentation/timeline/time-position" target="_blank" rel="noopener">Posições no tempo</a></li>
+          <li><a href="https://animejs.com/documentation/utilities/stagger/timeline-positions-staggering" target="_blank" rel="noopener">Posições escalonadas</a></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="feature" data-feature="scope" style="--part: var(--c7)">
+      <div class="feature-text">
+        <h2>Responsivo por escopo</h2>
+        <p><code>createScope</code> refaz as animações quando uma media query muda. Gire o celular ou use o botão na tela.</p>
+        <ul class="feature-links">
+          <li><a href="https://animejs.com/documentation/scope" target="_blank" rel="noopener">Scope</a></li>
+          <li><a href="https://animejs.com/documentation/scope/scope-parameters/mediaqueries" target="_blank" rel="noopener">Media queries</a></li>
+          <li><a href="https://animejs.com/documentation/adapters/threejs-adapter" target="_blank" rel="noopener">Adaptador Three.js</a></li>
+        </ul>
+      </div>
+    </article>
+  </section>
+
+  <div class="spacer half"></div>
+
+  <!-- ===================== 04 · ARQUITETURA ===================== -->
+  <section id="arquitetura" class="chapter is-blueprint" data-chapter="arquitetura" data-label="ARQUITETURA" data-sheet="04"
+           data-enter-offset="-=10lvh" data-leave-offset="-=60lvh">
+    <div class="fixed-section">
+      <div class="fixed-inner">
+        <div class="chapter-text">
+          <p class="eyebrow">Folha 04 · Lista de materiais</p>
+          <h2 class="chapter-title">Quanto pesa<br>cada peça</h2>
+          <p class="chapter-lede">Tudo o que o navegador baixa para montar esta página, medido em KB com gzip. Sem etapa de build, o three.js vem inteiro.</p>
+        </div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="spacer"></div>
+    <div class="spacer"></div>
+  </section>
+
+  <!-- ===================== 05 · CRÉDITOS ===================== -->
+  <section id="creditos" class="chapter" data-chapter="creditos" data-label="CREDITOS" data-sheet="05">
+    <div class="block">
+      <div class="block-text">
+        <p class="eyebrow">Folha 05 · Fornecedores</p>
+        <h2 class="chapter-title">Feito com peças abertas</h2>
+        <p class="chapter-lede">Todo o motor roda sobre bibliotecas e fontes livres. Nenhuma imagem ou modelo 3D foi baixado: a geometria é gerada no código.</p>
+      </div>
+      <ul class="credits">
+        <li><a href="https://threejs.org/" target="_blank" rel="noopener">
+          <span class="credit-name">three.js</span><span class="credit-role">WebGL, câmera, CSS3DRenderer</span><span class="credit-lic">MIT</span></a></li>
+        <li><a href="https://animejs.com/" target="_blank" rel="noopener">
+          <span class="credit-name">anime.js 4.5</span><span class="credit-role">Timelines, scroll, SVG, arraste</span><span class="credit-lic">MIT</span></a></li>
+        <li><a href="https://fonts.google.com/specimen/Archivo" target="_blank" rel="noopener">
+          <span class="credit-name">Archivo</span><span class="credit-role">Títulos e texto, eixo de largura</span><span class="credit-lic">OFL</span></a></li>
+        <li><a href="https://fonts.google.com/specimen/Martian+Mono" target="_blank" rel="noopener">
+          <span class="credit-name">Martian Mono</span><span class="credit-role">Rótulos, cotas e código</span><span class="credit-lic">OFL</span></a></li>
+      </ul>
+      <p class="note">Estudo independente, feito a partir da engenharia reversa do site do anime.js. Não é afiliado ao projeto anime.js.</p>
+    </div>
+    <div class="spacer half"></div>
+  </section>
+
+  <!-- ===================== 06 · COMEÇAR ===================== -->
+  <section id="comecar" class="chapter" data-chapter="comecar" data-label="COMECAR" data-sheet="06">
+    <div class="spacer half"></div>
+    <div class="block block-end">
+      <div class="block-text">
+        <p class="eyebrow">Folha 06 · Instruções de montagem</p>
+        <h2 class="chapter-title big">Comece a desmontar</h2>
+        <p class="chapter-lede">A documentação de cada peça usada aqui.</p>
+      </div>
+      <ul class="link-grid">
+        <li style="--part: var(--c0)"><a href="https://animejs.com/documentation/getting-started" target="_blank" rel="noopener"><span class="dot"></span>Primeiros passos<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c1)"><a href="https://animejs.com/documentation/timeline" target="_blank" rel="noopener"><span class="dot"></span>createTimeline<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c2)"><a href="https://animejs.com/documentation/events/onscroll" target="_blank" rel="noopener"><span class="dot"></span>onScroll<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c3)"><a href="https://animejs.com/documentation/utilities/stagger" target="_blank" rel="noopener"><span class="dot"></span>stagger<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c4)"><a href="https://animejs.com/documentation/svg/createdrawable" target="_blank" rel="noopener"><span class="dot"></span>createDrawable<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c5)"><a href="https://animejs.com/documentation/draggable" target="_blank" rel="noopener"><span class="dot"></span>createDraggable<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c6)"><a href="https://animejs.com/documentation/scope" target="_blank" rel="noopener"><span class="dot"></span>createScope<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c7)"><a href="https://animejs.com/documentation/text/splittext" target="_blank" rel="noopener"><span class="dot"></span>splitText<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c0)"><a href="https://animejs.com/documentation/adapters/threejs-adapter" target="_blank" rel="noopener"><span class="dot"></span>Adaptador Three.js<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c1)"><a href="https://animejs.com/documentation/adapters/threejs-adapter/materials-and-uniforms" target="_blank" rel="noopener"><span class="dot"></span>Uniforms de shader<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c4)"><a href="https://threejs.org/docs/" target="_blank" rel="noopener"><span class="dot"></span>three.js · docs<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+        <li style="--part: var(--c5)"><a href="https://threejs.org/manual/" target="_blank" rel="noopener"><span class="dot"></span>three.js · manual<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5"/></svg></a></li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<!-- Camada de interface fixa: régua de progresso + cartões de código -->
+<aside class="sub-nav" aria-label="Progresso e código">
+  <div class="cards">
+<pre class="code-card" data-card="api"><code>animate('.bloco', {
+  x: [{ to: -80 }, { to: 80 }, { to: 0 }],
+  y: [{ to: -60, ease: 'out(3)' }, { to: 0 }],
+  rotate: { to: 360, ease: 'inOutBack' },
+  borderRadius: ['18%', '50%'],
+  duration: 2400,
+  loop: true,
+  alternate: true,
+});</code></pre>
+<pre class="code-card" data-card="blend"><code>const pontos = utils.$('.ponto');
+
+createTimer({
+  duration: 900,
+  loop: true,
+  onLoop: () => animate(pontos, {
+    x: () => utils.random(-110, 110),
+    y: () => utils.random(-110, 110),
+    composition: 'blend',
+  }),
+});</code></pre>
+<pre class="code-card" data-card="scroll"><code>animate(createDrawable('.orbita'), {
+  draw: ['0 0', '0 1', '1 1'],
+  delay: stagger(70),
+  ease: 'inOut(3)',
+  autoplay: onScroll({ sync: true }),
+});</code></pre>
+<pre class="code-card" data-card="stagger"><code>const onda = (origem) => animate('.celula', {
+  scale: [{ to: .2 }, { to: 1 }],
+  rotate: { from: -90, to: 0 },
+  delay: stagger(45, {
+    grid: [11, 11],
+    from: origem,
+  }),
+});
+
+onda('center');</code></pre>
+<pre class="code-card" data-card="svg"><code>animate(createDrawable('.pista'), {
+  draw: ['0 0', '0 1', '1 1'],
+  duration: 3200, loop: true,
+});
+
+animate('.carro', {
+  ...createMotionPath('.pista'),
+  ease: 'linear', duration: 3200, loop: true,
+});
+
+animate('.forma-a', { d: morphTo('.forma-b') });</code></pre>
+<pre class="code-card" data-card="drag"><code>createDraggable('.peca', {
+  container: '.arena',
+  snap: [0],
+  releaseEase: spring({
+    stiffness: 140,
+    damping: 7,
+  }),
+});</code></pre>
+<pre class="code-card" data-card="timeline"><code>createTimeline({ loop: true })
+  .label('compasso')
+  .add('.cabeca', {
+    x: ['0%', '800%'],
+    ease: steps(8), duration: 2000,
+  }, 'compasso')
+  .add('.pad.on', {
+    scale: [1.4, 1], opacity: [1, .45],
+    duration: 220,
+  }, stagger(250, { use: 'data-step' }));</code></pre>
+<pre class="code-card" data-card="scope"><code>createScope({
+  mediaQueries: {
+    retrato: '(orientation: portrait)',
+  },
+})
+.add(({ matches }) => {
+  const eixo = matches.retrato ? 'x' : 'y';
+  animate('.barra', {
+    [eixo]: [-46, 46],
+    delay: stagger(90),
+    loop: true, alternate: true,
+  });
+});</code></pre>
+    <div class="chart-card" data-card="arquitetura">
+      <div class="chart-head">
+        <h3>Peso transferido</h3>
+        <p class="chart-total"><span class="chart-total-num">0.0</span> KB</p>
+      </div>
+      <div class="chart-bar" role="img" aria-label="Barra empilhada com o peso de cada parte do site"></div>
+      <ul class="chart-legend"></ul>
+      <p class="chart-foot">gzip -9 dos arquivos servidos · three.js r186 · anime.js 4.5.0</p>
+    </div>
+  </div>
+  <div class="progress-card">
+    <span class="sheet-label">FL. <span data-sheet-now>01</span>/06</span>
+    <div class="ruler" role="slider" aria-label="Progresso da página" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+      <div class="ruler-marks"></div>
+      <div class="ruler-ghost"></div>
+      <div class="ruler-cursor"></div>
+    </div>
+  </div>
+</aside>
+
+<footer id="site-footer">
+  <div class="footer-row">
+    <div class="footer-brand">
+      <span class="wordmark static"><span class="wordmark-letters">desmonte</span><span class="wordmark-dot"></span></span>
+      <p>Um estudo aberto sobre sites animados.<br>Desenho 06 folhas, escala 1:1.</p>
+    </div>
+    <div class="footer-col">
+      <h3>Folhas</h3>
+      <ul>
+        <li><a href="#intro">01 · Início</a></li>
+        <li><a href="#pecas">02 · Peças</a></li>
+        <li><a href="#tecnicas">03 · Técnicas</a></li>
+        <li><a href="#arquitetura">04 · Arquitetura</a></li>
+        <li><a href="#comecar">06 · Começar</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h3>Referências</h3>
+      <ul>
+        <li><a href="https://animejs.com/documentation" target="_blank" rel="noopener">anime.js · documentação</a></li>
+        <li><a href="https://github.com/juliangarnier/anime" target="_blank" rel="noopener">anime.js · código</a></li>
+        <li><a href="https://threejs.org/docs/" target="_blank" rel="noopener">three.js · documentação</a></li>
+        <li><a href="https://github.com/mrdoob/three.js" target="_blank" rel="noopener">three.js · código</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-giant" aria-hidden="true"><span class="footer-giant-letters">desmonte</span><span class="footer-giant-dotwrap"><span class="footer-giant-dot"></span></span></div>
+</footer>
+
+<!-- Camada 2: a "tela" do motor, DOM real posicionado em 3D pelo CSS3DRenderer -->
+<div id="screen-layer"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
